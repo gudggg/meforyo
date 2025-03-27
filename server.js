@@ -31,19 +31,39 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 
+const users = {};
+
 wss.on('connection', (ws) => {
     console.log('Client connected.');
 
     ws.on('message', (message) => {
-        wss.clients.forEach((client) => {
-            if (client !== ws && client.readyState === WebSocket.OPEN) {
-                client.send(message.toString());
-            }
-        });
+        const data = JSON.parse(message.toString());
+        if (data.type === 'join') {
+            users[ws] = data.username;
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN){
+                client.send(JSON.stringify({ type: 'userJoined', username: data.username }));
+              }
+            });
+
+        } else if (data.type === 'message') {
+            wss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({ type: 'message', username: users[ws], message: data.message }));
+                }
+            });
+        }
     });
 
     ws.on('close', () => {
         console.log('Client disconnected.');
+        const username = users[ws];
+        delete users[ws];
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN){
+            client.send(JSON.stringify({type: 'userLeft', username: username}));
+          }
+        });
     });
 });
 
