@@ -10,6 +10,7 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server });
 
 const users = new Map();
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 
 wss.on('connection', (ws) => {
     console.log('Client connected');
@@ -24,6 +25,13 @@ wss.on('connection', (ws) => {
                     break;
                 case 'message':
                     broadcastMessage(parsedMessage.username, parsedMessage.text);
+                    break;
+                case 'media':
+                    if (parsedMessage.data.length > MAX_FILE_SIZE) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'File size exceeds limit' }));
+                        return;
+                    }
+                    broadcastMedia(parsedMessage.username, parsedMessage.data, parsedMessage.contentType);
                     break;
             }
         } catch (error) {
@@ -55,8 +63,15 @@ function broadcastUsers() {
     });
 }
 
+function broadcastMedia(username, data, contentType) {
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'media', username, data, contentType }));
+        }
+    });
+}
+
 const port = process.env.PORT || 8080;
 server.listen(port, () => {
     console.log(`WebSocket server listening on port ${port}`);
 });
-              
