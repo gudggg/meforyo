@@ -1,73 +1,62 @@
 // server.js (Node.js with WebSocket)
 const WebSocket = require('ws');
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 
 const server = http.createServer((req, res) => {
-    if (req.url === '/') {
-        fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-            if (err) {
-                res.writeHead(500);
-                res.end('Error loading index.html');
-            } else {
-                res.writeHead(200, { 'Content-Type': 'text/html' });
-                res.end(data);
-            }
-        });
-    } else {
-      fs.readFile(path.join(__dirname, req.url), (err, data) => {
-          if (err) {
-              res.writeHead(404);
-              res.end('File not found');
-          } else {
-              res.writeHead(200);
-              res.end(data);
-          }
-      });
-    }
-
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('WebSocket server running');
 });
 
 const wss = new WebSocket.Server({ server });
 
-const users = {};
+const users = new Map();
 
 wss.on('connection', (ws) => {
-    console.log('Client connected.');
+    console.log('Client connected');
 
     ws.on('message', (message) => {
-        const data = JSON.parse(message.toString());
-        if (data.type === 'join') {
-            users[ws] = data.username;
-            wss.clients.forEach((client) => {
-              if (client.readyState === WebSocket.OPEN){
-                client.send(JSON.stringify({ type: 'userJoined', username: data.username }));
-              }
-            });
-
-        } else if (data.type === 'message') {
-            wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({ type: 'message', username: users[ws], message: data.message }));
-                }
-            });
+        try {
+            const parsedMessage = JSON.parse(message);
+            switch (parsedMessage.type) {
+                case 'join':
+                    users.set(ws, parsedMessage.username);
+                    broadcastUsers();
+                    break;
+                case 'message':
+                    broadcastMessage(parsedMessage.username, parsedMessage.text);
+                    break;
+            }
+        } catch (error) {
+            console.error('Error parsing message:', error);
         }
     });
 
     ws.on('close', () => {
-        console.log('Client disconnected.');
-        const username = users[ws];
-        delete users[ws];
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN){
-            client.send(JSON.stringify({type: 'userLeft', username: username}));
-          }
-        });
+        console.log('Client disconnected');
+        users.delete(ws);
+        broadcastUsers();
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
+function broadcastMessage(username, text) {
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'message', username, text }));
+        }
+    });
+}
+
+function broadcastUsers() {
+    const userList = Array.from(users.values());
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'users', users: userList }));
+        }
+    });
+}
+
+const port = process.env.PORT || 8080;
+server.listen(port, () => {
+    console.log(`WebSocket server listening on port ${port}`);
 });
+              
