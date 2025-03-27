@@ -1,15 +1,15 @@
 {
-  "name": "chat-app",
+  "name": "livechat",
   "version": "1.0.0",
-  "description": "A simple live chat app",
+  "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.7.5"
-  },
-  "author": "Your Name",
-  "license": "MIT"
+    "ws": "^8.13.0"
+  }
 }
